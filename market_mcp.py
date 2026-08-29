@@ -11,6 +11,7 @@ Self-check:      python market_mcp.py check
 import json
 import os
 import sys
+import threading
 from datetime import date, timedelta
 
 from mcp.server.mcpserver import MCPServer
@@ -26,6 +27,8 @@ START_CASH = 1_000_000.0  # ten lakh virtual rupees
 READ = ToolAnnotations(readOnlyHint=True)
 WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
 
+LOCK = threading.Lock()  # one lock around all state changes, plenty for one user
+
 mcp = MCPServer("market")
 
 
@@ -37,8 +40,11 @@ def load(path, default):
 
 
 def save(path, data):
-    with open(path, "w") as f:
+    # write to a temp file first so a crash can't leave half-written json
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(data, f, indent=2)
+    os.replace(tmp, path)
 
 
 def sim_today():
@@ -66,8 +72,9 @@ def last_price(symbol):
 
 def rsi14(close):
     change = close.diff()
-    gain = change.clip(lower=0).ewm(alpha=1 / 14).mean()
-    loss = -change.clip(upper=0).ewm(alpha=1 / 14).mean()
+    # adjust=False gives Wilder-style recursive smoothing
+    gain = change.clip(lower=0).ewm(alpha=1 / 14, adjust=False, min_periods=14).mean()
+    loss = -change.clip(upper=0).ewm(alpha=1 / 14, adjust=False, min_periods=14).mean()
     return float((100 - 100 / (1 + gain / loss)).iloc[-1])
 
 
@@ -126,24 +133,30 @@ def valued_portfolio():
 @mcp.tool(annotations=WRITE)
 def set_date(day: str) -> str:
     """Start (or restart) the simulation on a past date (YYYY-MM-DD). Resets the portfolio to fresh cash."""
-    if date.fromisoformat(day) > date.today():
-        return "error: pick a date in the past"
-    save(STATE, {"today": day})
-    save(PORTFOLIO, {"cash": START_CASH, "positions": {}})
+    if date.fromisoformat(day) >= date.today():
+        return "error: pick a date before today, only completed sessions have a final close"
+    with LOCK:
+        save(PORTFOLIO, {"cash": START_CASH, "positions": {}})
+        save(STATE, {"today": day})
     return "simulation reset: today is %s, cash %.0f" % (day, START_CASH)
 
 
 @mcp.tool(annotations=WRITE)
 def advance(days: int) -> dict:
     """Move the simulated clock forward N days and revalue the portfolio, revealing how the trades did."""
-    try:
-        new_day = date.fromisoformat(sim_today()) + timedelta(days=days)
-        if new_day > date.today():
-            return {"error": "cannot advance past the real today"}
+    if days <= 0:
+        return {"error": "days must be positive, the clock only moves forward"}
+    with LOCK:
+        old_day = sim_today()
+        new_day = date.fromisoformat(old_day) + timedelta(days=days)
+        if new_day >= date.today():
+            return {"error": "can only advance up to yesterday, today has no final close yet"}
         save(STATE, {"today": str(new_day)})
-        return valued_portfolio()
-    except Exception as e:
-        return {"error": str(e)}
+        try:
+            return valued_portfolio()
+        except Exception as e:
+            save(STATE, {"today": old_day})  # don't keep a date the reveal failed on
+            return {"error": str(e)}
 
 
 @mcp.tool(annotations=READ)
@@ -180,11 +193,12 @@ def buy(symbol: str, qty: int) -> str:
         price = last_price(symbol)
     except Exception as e:
         return "error: " + str(e)
-    p = load(PORTFOLIO, {"cash": START_CASH, "positions": {}})
-    result = apply_buy(p, symbol, qty, price)
-    if not result.startswith("error"):
-        save(PORTFOLIO, p)
-        log_trade(result)
+    with LOCK:
+        p = load(PORTFOLIO, {"cash": START_CASH, "positions": {}})
+        result = apply_buy(p, symbol, qty, price)
+        if not result.startswith("error"):
+            save(PORTFOLIO, p)
+            log_trade(result)
     return result
 
 
@@ -195,11 +209,12 @@ def sell(symbol: str, qty: int) -> str:
         price = last_price(symbol)
     except Exception as e:
         return "error: " + str(e)
-    p = load(PORTFOLIO, {"cash": START_CASH, "positions": {}})
-    result = apply_sell(p, symbol, qty, price)
-    if not result.startswith("error"):
-        save(PORTFOLIO, p)
-        log_trade(result)
+    with LOCK:
+        p = load(PORTFOLIO, {"cash": START_CASH, "positions": {}})
+        result = apply_sell(p, symbol, qty, price)
+        if not result.startswith("error"):
+            save(PORTFOLIO, p)
+            log_trade(result)
     return result
 
 
