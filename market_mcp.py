@@ -24,6 +24,24 @@ MEMORY = os.path.join(HERE, "memory.md")
 TRADES = os.path.join(HERE, "trades.log")
 START_CASH = 1_000_000.0  # ten lakh virtual rupees
 
+# Screening universe: 100 NSE large caps, roughly today's NIFTY 100.
+# Hardcoded so the screener works for anyone who clones this. Because it's
+# today's list, historical scans carry survivorship bias — acceptable for a
+# paper-trading demo, wrong for real backtesting.
+NIFTY100 = """
+RELIANCE TCS HDFCBANK ICICIBANK INFY BHARTIARTL SBIN LICI ITC HINDUNILVR
+LT BAJFINANCE HCLTECH MARUTI SUNPHARMA KOTAKBANK TITAN ONGC BAJAJHLDNG NTPC
+AXISBANK DMART ADANIENT ULTRACEMCO ASIANPAINT COALINDIA BAJAJFINSV POWERGRID M&M NESTLEIND
+WIPRO IOC JSWSTEEL HAL DLF ADANIPORTS SIEMENS TATASTEEL SBILIFE IRFC
+GRASIM VEDL BEL PIDILITIND HDFCLIFE HINDZINC INDHOTEL TRENT VBL BPCL
+PNB ABB TECHM AMBUJACEM INDUSINDBK TATAPOWER BANKBARODA GAIL HINDALCO GODREJCP
+EICHERMOT BRITANNIA ADANIPOWER LODHA CIPLA DABUR BAJAJ-AUTO CANBK DIVISLAB SHREECEM
+CHOLAFIN HAVELLS TVSMOTOR HEROMOTOCO DRREDDY APOLLOHOSP TORNTPHARM ICICIPRULI JINDALSTEL SHRIRAMFIN
+INDIGO ETERNAL NAUKRI BOSCHLTD JIOFIN IRCTC ZYDUSLIFE BERGEPAINT MOTHERSON PFC
+RECLTD UNIONBANK IDBI COLPAL MARICO YESBANK ATGL SRF ALKEM MUTHOOTFIN
+""".split()
+NIFTY100 = [s + ".NS" for s in NIFTY100]
+
 READ = ToolAnnotations(readOnlyHint=True)
 WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
 
@@ -160,6 +178,37 @@ def advance(days: int) -> dict:
 
 
 @mcp.tool(annotations=READ)
+def scan() -> dict:
+    """Screen a fixed universe of 100 NSE large caps (roughly today's NIFTY 100) at the simulated
+    date. Returns up to 10 candidates passing the entry rules (price above SMA50, RSI14 below 70),
+    strongest 3-month return first. Use this to pick stocks when the user hasn't named any.
+    Note: the universe is today's list, so scans on old dates carry survivorship bias."""
+    import yfinance as yf
+
+    try:
+        end = date.fromisoformat(sim_today()) + timedelta(days=1)
+        df = yf.download(NIFTY100, start=str(end - timedelta(days=300)), end=str(end),
+                         progress=False, auto_adjust=True)["Close"]
+        picks = []
+        for sym in NIFTY100:
+            try:
+                close = df[sym].dropna()
+                price = float(close.iloc[-1])
+                sma50 = float(close.rolling(50).mean().iloc[-1])
+                rsi = rsi14(close)
+                if price > sma50 and rsi < 70:
+                    picks.append({"symbol": sym, "price": round(price, 2),
+                                  "rsi14": round(rsi, 1),
+                                  "return_3m": round(price / float(close.iloc[-64]) - 1, 4)})
+            except Exception:
+                continue  # some names lack history on old dates, skip them
+        picks.sort(key=lambda x: -x["return_3m"])
+        return {"date": sim_today(), "scanned": len(NIFTY100), "candidates": picks[:10]}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@mcp.tool(annotations=READ)
 def history(symbol: str) -> dict:
     """Price snapshot with simple indicators as of the simulated date. NSE symbols need .NS, e.g. RELIANCE.NS."""
     try:
@@ -237,6 +286,8 @@ def recall() -> str:
 
 def check():
     """Offline self-check of the portfolio math and indicators."""
+    assert len(set(NIFTY100)) == 100, "universe must be exactly 100 unique symbols"
+
     p = {"cash": 2000.0, "positions": {}}
     assert apply_buy(p, "X", 0, 10).startswith("error")
     assert apply_buy(p, "X", 300, 10).startswith("error")  # too expensive
