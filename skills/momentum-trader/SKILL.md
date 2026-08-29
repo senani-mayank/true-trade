@@ -19,9 +19,9 @@ Everything runs on a simulated clock: `set_date` starts a run in the past,
 
 ## Analysis
 
-If the user hasn't named symbols, call `scan` first — it screens the whole
-NIFTY 100 universe as of the simulated date and returns up to 10 candidates
-that already pass the entry rules, strongest momentum first.
+If the user hasn't named symbols, call `scan` first — it screens a fixed
+universe of 100 NSE large caps at the simulated date and returns up to 10
+candidates that already pass the entry rules, strongest momentum first.
 
 Analyze each candidate symbol in its own parallel subagent (one `history` call
 per symbol), then merge the results into one comparison table: price, SMA20,

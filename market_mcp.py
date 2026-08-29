@@ -24,8 +24,10 @@ MEMORY = os.path.join(HERE, "memory.md")
 TRADES = os.path.join(HERE, "trades.log")
 START_CASH = 1_000_000.0  # ten lakh virtual rupees
 
-# NIFTY 100 universe (large caps, close enough for a paper-trading demo).
-# Hardcoded so the screener works offline-ish and for anyone who clones this.
+# Screening universe: 100 NSE large caps, roughly today's NIFTY 100.
+# Hardcoded so the screener works for anyone who clones this. Because it's
+# today's list, historical scans carry survivorship bias — acceptable for a
+# paper-trading demo, wrong for real backtesting.
 NIFTY100 = """
 RELIANCE TCS HDFCBANK ICICIBANK INFY BHARTIARTL SBIN LICI ITC HINDUNILVR
 LT BAJFINANCE HCLTECH MARUTI SUNPHARMA KOTAKBANK TITAN ONGC BAJAJHLDNG NTPC
@@ -177,9 +179,10 @@ def advance(days: int) -> dict:
 
 @mcp.tool(annotations=READ)
 def scan() -> dict:
-    """Screen the whole NIFTY 100 universe as of the simulated date. Returns up to 10 candidates
-    that pass the entry rules (price above SMA50, RSI14 below 70), strongest 3-month return first.
-    Use this to pick stocks when the user hasn't named any."""
+    """Screen a fixed universe of 100 NSE large caps (roughly today's NIFTY 100) at the simulated
+    date. Returns up to 10 candidates passing the entry rules (price above SMA50, RSI14 below 70),
+    strongest 3-month return first. Use this to pick stocks when the user hasn't named any.
+    Note: the universe is today's list, so scans on old dates carry survivorship bias."""
     import yfinance as yf
 
     try:
@@ -283,6 +286,8 @@ def recall() -> str:
 
 def check():
     """Offline self-check of the portfolio math and indicators."""
+    assert len(set(NIFTY100)) == 100, "universe must be exactly 100 unique symbols"
+
     p = {"cash": 2000.0, "positions": {}}
     assert apply_buy(p, "X", 0, 10).startswith("error")
     assert apply_buy(p, "X", 300, 10).startswith("error")  # too expensive
