@@ -89,10 +89,20 @@ review the results and save a lesson."*
 Every substantive change in this repo went through a pull request reviewed by
 Qodo Merge before merging.
 
-- Representative PR: TODO_PR_LINK
-- What Qodo surfaced and what we did: TODO_AFTER_REVIEW
-- Full PR history with reviews and decisions: [closed PRs](https://github.com/senani-mayank/true-trade/pulls?q=is%3Apr+is%3Aclosed)
-- Follow-up review against the final code: TODO_FINAL_PR_LINK
+- Representative PR: [#1 — the tool server](https://github.com/senani-mayank/true-trade/pull/1).
+  Qodo surfaced 8 findings, several of them real correctness bugs: the sim
+  clock could move backward, trades could execute on today's unfinished
+  close, and (High severity) the price lookup raced against clock changes.
+  We fixed 7 across follow-up commits on the PR and dismissed 1 in the Qodo
+  thread with a reason (trades.log is a demo convenience log, not the source
+  of truth — portfolio.json is); Qodo marked the dismissal and its follow-up
+  review of the final code came back clean.
+- [#2 — the strategy skill](https://github.com/senani-mayank/true-trade/pull/2):
+  Qodo caught that the skill let remembered lessons *override* the hard risk
+  rules — a genuinely good catch for an agent that learns. Fixed so lessons
+  can only make the agent stricter, never looser; the re-review reported
+  zero bugs.
+- Full PR history with reviews, fixes and decisions: [closed PRs](https://github.com/senani-mayank/true-trade/pulls?q=is%3Apr+is%3Aclosed)
 
 ## Disclosure
 
