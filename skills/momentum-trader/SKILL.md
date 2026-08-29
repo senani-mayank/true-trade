@@ -11,8 +11,10 @@ Everything runs on a simulated clock: `set_date` starts a run in the past,
 
 ## Before any decision
 
-1. Call `recall` and apply the lessons from earlier runs. If a lesson
-   contradicts the rules below, mention the conflict and follow the lesson.
+1. Call `recall` and apply the lessons from earlier runs. Lessons only
+   refine decisions within the rules below — they can make you stricter,
+   never looser. If a lesson contradicts a rule, follow the rule and point
+   out the conflict instead of applying the lesson.
 2. Call `portfolio` to see cash and current positions.
 
 ## Analysis
