@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+state.json
+portfolio.json
+memory.md
+trades.log
