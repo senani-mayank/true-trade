@@ -189,11 +189,11 @@ def portfolio() -> dict:
 @mcp.tool(annotations=WRITE)
 def buy(symbol: str, qty: int) -> str:
     """Buy shares at the simulated date's closing price. Paper money only."""
-    try:
-        price = last_price(symbol)
-    except Exception as e:
-        return "error: " + str(e)
-    with LOCK:
+    with LOCK:  # price lookup inside the lock so the clock can't move mid-trade
+        try:
+            price = last_price(symbol)
+        except Exception as e:
+            return "error: " + str(e)
         p = load(PORTFOLIO, {"cash": START_CASH, "positions": {}})
         result = apply_buy(p, symbol, qty, price)
         if not result.startswith("error"):
@@ -205,11 +205,11 @@ def buy(symbol: str, qty: int) -> str:
 @mcp.tool(annotations=WRITE)
 def sell(symbol: str, qty: int) -> str:
     """Sell shares at the simulated date's closing price. Paper money only."""
-    try:
-        price = last_price(symbol)
-    except Exception as e:
-        return "error: " + str(e)
-    with LOCK:
+    with LOCK:  # price lookup inside the lock so the clock can't move mid-trade
+        try:
+            price = last_price(symbol)
+        except Exception as e:
+            return "error: " + str(e)
         p = load(PORTFOLIO, {"cash": START_CASH, "positions": {}})
         result = apply_sell(p, symbol, qty, price)
         if not result.startswith("error"):
