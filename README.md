@@ -31,6 +31,7 @@ back with `recall` — so it visibly learns across cycles.
 | Tool | What it does | Needs approval |
 |---|---|---|
 | `set_date` | start/reset the simulation on a past date | yes |
+| `scan` | screen 100 NSE large caps, top 10 momentum candidates | no |
 | `history` | price + SMA20/50, RSI14, 1m/3m returns as of the sim date | no |
 | `portfolio` | cash, positions, unrealised P&L | no |
 | `buy` / `sell` | trade at the sim date's closing price | **yes** |
@@ -82,7 +83,7 @@ review the results and save a lesson."*
 
 ## Demo
 
-[Demo video (~3 min)](TODO_VIDEO_LINK)
+[Demo video (~3 min)](https://www.youtube.com/watch?v=Qc00WekV7CU)
 
 ## Qodo Code Review Evidence
 
