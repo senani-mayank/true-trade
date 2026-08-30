@@ -311,4 +311,12 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "check":
         check()
     else:
+        try:  # macOS defaults to 256 open files; parallel yfinance calls blow past that
+            import resource
+            soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+            want = 4096 if hard == resource.RLIM_INFINITY else min(4096, hard)
+            if soft != resource.RLIM_INFINITY and soft < want:  # only ever raise
+                resource.setrlimit(resource.RLIMIT_NOFILE, (want, hard))
+        except Exception as e:
+            print("warning: could not raise open-files limit: %s" % e, file=sys.stderr)
         mcp.run(transport="streamable-http", port=8765)
