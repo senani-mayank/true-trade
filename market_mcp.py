@@ -311,4 +311,10 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "check":
         check()
     else:
+        try:  # macOS defaults to 256 open files; parallel yfinance calls blow past that
+            import resource
+            _soft, _hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+            resource.setrlimit(resource.RLIMIT_NOFILE, (min(4096, _hard), _hard))
+        except Exception:
+            pass
         mcp.run(transport="streamable-http", port=8765)
